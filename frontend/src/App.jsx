@@ -17,6 +17,8 @@ import AutourDeMoi from './pages/AutourDeMoi';
 import DonnerAvis from './pages/DonnerAvis';
 import Articles from './pages/Articles';
 import Examens from './pages/Examens';
+import PolitiqueConfidentialite from './pages/PolitiqueConfidentialite';
+import BanniereRGPD from './components/BanniereRGPD';
 
 function App() {
   return (
@@ -40,7 +42,9 @@ function App() {
         <Route path="/avis" element={<DonnerAvis />} />
         <Route path="/articles" element={<Articles />} />
         <Route path="/examens" element={<Examens />} />
+        <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
       </Routes>
+      <BanniereRGPD />
     </BrowserRouter>
   );
 }
