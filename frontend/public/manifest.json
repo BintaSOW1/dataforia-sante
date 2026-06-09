@@ -1,0 +1,55 @@
+{
+    "name": "DataforiaSanté",
+    "short_name": "DataforiaSanté",
+    "description": "Plateforme santé numérique du Sénégal — Médecins, Pharmacies, Hôpitaux, Téléconsultation",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#F4FBF7",
+    "theme_color": "#006B3F",
+    "orientation": "portrait",
+    "lang": "fr",
+    "icons": [
+      {
+        "src": "/icon-192.png",
+        "sizes": "192x192",
+        "type": "image/png",
+        "purpose": "any"
+      },
+      {
+        "src": "/icon-192.png",
+        "sizes": "192x192",
+        "type": "image/png",
+        "purpose": "maskable"
+      },
+      {
+        "src": "/icon-512.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "any"
+      },
+      {
+        "src": "/icon-512.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "maskable"
+      }
+    ],
+    "categories": ["health", "medical"],
+    "shortcuts": [
+      {
+        "name": "Trouver un médecin",
+        "url": "/medecins",
+        "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      },
+      {
+        "name": "DatoBot IA",
+        "url": "/datobot",
+        "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      },
+      {
+        "name": "Pharmacies",
+        "url": "/pharmacies",
+        "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      }
+    ]
+  }
