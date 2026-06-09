@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' }
 });
@@ -50,5 +50,6 @@ export const getExamens = (params = {}) => API.get('/examens', { params });
 export const getStructuresExamen = (id) => API.get(`/examens/${id}/structures`);
 export const getStructures = (params = {}) => API.get('/examens/structures', { params });
 export const analyserOrdonnance = (data) => API.post('/examens/analyser-ordonnance', data);
+
 
 export default API;
