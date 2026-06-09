@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../supabase');
+const { supabaseAdmin: supabase } = require('../supabase');
 
 // GET /api/pharmacies
 router.get('/', async (req, res) => {

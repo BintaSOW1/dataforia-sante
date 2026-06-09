@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Anthropic = require('@anthropic-ai/sdk');
-const supabase = require('../supabase');
+const supabase = require('../supabase').supabaseAdmin || require('../supabase');
 const axios = require('axios');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

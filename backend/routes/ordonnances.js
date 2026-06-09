@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../supabase');
+const { supabaseAdmin: supabase } = require('../supabase');
 
 // POST /api/ordonnances — envoyer une ordonnance
 router.post('/', async (req, res) => {

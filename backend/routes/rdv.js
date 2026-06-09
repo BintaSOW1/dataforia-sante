@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../supabase');
+const supabase = require('../supabase').supabaseAdmin || require('../supabase');
 const axios = require('axios');
 
 // Générer un lien Jitsi unique

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../supabase');
+const { supabaseAdmin: supabase } = require('../supabase');
 const Anthropic = require('@anthropic-ai/sdk');
 
 // GET /api/examens — liste tous les examens
