@@ -35,7 +35,8 @@ function detecterUrgence(message) {
     'hémorragie', 'bleeding', 'avc', 'stroke', 'paralysie',
     'difficultés respirer', 'cannot breathe', 'saignement abondant',
     'accouchement imminent', 'suicide', 'me faire du mal',
-    'deuneu buy metti', 'kheum', 'meunoul nooyi', 'deerett bou bari', 'weusiin', 'kharou'
+    'deuneu buy metti', 'kheum', 'meunoul nooyi', 'deerett bou bari', 'weusiin', 'kharou','metiteu ci sama dënn',
+    'metiteu ci dënn','sama dënn buy metti'
   ];
   return motsUrgence.some(mot => msg.includes(mot));
 }
