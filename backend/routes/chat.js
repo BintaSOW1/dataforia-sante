@@ -126,6 +126,50 @@ function suggererSpecialite(message) {
   return 'generaliste';
 }
 
+// ═══════════════════════════════════
+// MODULE RAG — RECHERCHE SÉMANTIQUE
+// ═══════════════════════════════════
+
+async function genererEmbedding(texte) {
+  try {
+    const response = await fetch('https://api.voyageai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.VOYAGE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'voyage-2',
+        input: texte
+      })
+    });
+    const data = await response.json();
+    return data.data[0].embedding;
+  } catch (err) {
+    console.error('Erreur embedding:', err);
+    return null;
+  }
+}
+
+async function rechercherKnowledge(query) {
+  try {
+    const embedding = await genererEmbedding(query);
+    if (!embedding) return [];
+
+    const { data, error } = await supabaseAdmin.rpc('recherche_knowledge', {
+      query_embedding: embedding,
+      match_threshold: 0.5,
+      match_count: 2
+    });
+
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error('Erreur RAG:', err);
+    return [];
+  }
+}
+
 function preprocessMessage(message) {
   const langue = detecterLangue(message);
   const urgence = detecterUrgence(message);
@@ -381,9 +425,24 @@ router.post('/', async (req, res) => {
   // PREPROCESSING
   const analyse = preprocessMessage(message);
   console.log('📊 Preprocessing:', JSON.stringify(analyse));
+  // RAG — Recherche dans la base de connaissances
+let contexteMedical = '';
+try {
+  const docs = await rechercherKnowledge(message);
+  if (docs && docs.length > 0) {
+    contexteMedical = `\n\n[BASE DE CONNAISSANCES MÉDICALES SÉNÉGAL]\n`;
+    docs.forEach(doc => {
+      contexteMedical += `\n--- ${doc.titre} (pertinence: ${Math.round(doc.similarity * 100)}%) ---\n`;
+      contexteMedical += doc.contenu.substring(0, 500) + '...\n';
+    });
+    console.log(`📚 RAG: ${docs.length} document(s) trouvé(s)`);
+  }
+} catch (err) {
+  console.error('Erreur RAG:', err);
+}
 
-  // Message enrichi avec contexte
-  const messageEnrichi = `${message}
+// Message enrichi avec contexte preprocessing + RAG
+const messageEnrichi = `${message}
 
 [CONTEXTE DÉTECTÉ AUTOMATIQUEMENT]
 - Langue: ${analyse.langue}
@@ -394,8 +453,12 @@ router.post('/', async (req, res) => {
 - Symptômes: ${analyse.entites.symptomes.join(', ') || 'aucun'}
 - Durée: ${analyse.entites.duree || 'non précisée'}
 - Localisation: ${analyse.entites.localisation || 'non précisée'}
-- Intensité: ${analyse.entites.intensite || 'non précisée'}`;
+- Intensité: ${analyse.entites.intensite || 'non précisée'}
+${contexteMedical}`;
 
+historique.push({ role: 'user', content: messageEnrichi });
+
+ 
   historique.push({ role: 'user', content: messageEnrichi });
   if (historique.length > 20) historique.splice(0, 2);
 
