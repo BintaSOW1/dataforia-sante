@@ -34,6 +34,8 @@ app.use('/api/ordonnances', require('./routes/ordonnances'));
 app.use('/api/dossiers', require('./routes/dossiers'));
 app.use('/api/avis', require('./routes/avis'));
 app.use('/api/examens', require('./routes/examens'));
+app.use('/api/knowledge', require('./routes/knowledge'));
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
