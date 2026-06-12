@@ -456,7 +456,7 @@ const messageEnrichi = `${message}
 - Intensité: ${analyse.entites.intensite || 'non précisée'}
 ${contexteMedical}`;
 
-historique.push({ role: 'user', content: messageEnrichi });
+
 
  
   historique.push({ role: 'user', content: messageEnrichi });
