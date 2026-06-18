@@ -1,0 +1,116 @@
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+import torch
+import librosa
+import soundfile as sf
+import numpy as np
+import tempfile
+import os
+from transformers import WhisperFeatureExtractor, WhisperTokenizer, WhisperProcessor, WhisperForConditionalGeneration
+
+app = FastAPI(title="DatoBot Wolof Service")
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"🖥️ Device : {device}")
+
+STT_MODEL_PATH = os.getenv('STT_MODEL_PATH', './models/whisper_wolof_final')
+TTS_SAMPLES_PATH = os.getenv('TTS_SAMPLES_PATH', './models/samples')
+
+print("⏳ Chargement Whisper STT wolof...")
+try:
+    feature_extractor = WhisperFeatureExtractor.from_pretrained(STT_MODEL_PATH)
+    tokenizer = WhisperTokenizer.from_pretrained(STT_MODEL_PATH)
+    stt_processor = WhisperProcessor(feature_extractor=feature_extractor, tokenizer=tokenizer)
+    stt_model = WhisperForConditionalGeneration.from_pretrained(STT_MODEL_PATH, local_files_only=True)
+    stt_model = stt_model.to(device)
+    stt_model.eval()
+    print("✅ Whisper STT chargé !")
+except Exception as e:
+    print(f"⚠️ STT non disponible : {e}")
+    stt_processor = None
+    stt_model = None
+
+print("⏳ Chargement XTTS v2 TTS...")
+try:
+    os.environ["COQUI_TOS_AGREED"] = "1"
+    original_load = torch.load
+    def patched_load(*args, **kwargs):
+        kwargs['weights_only'] = False
+        return original_load(*args, **kwargs)
+    torch.load = patched_load
+    from TTS.api import TTS
+    tts_model = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
+    tts_model = tts_model.to(device)
+    samples = []
+    if os.path.exists(TTS_SAMPLES_PATH):
+        for f in os.listdir(TTS_SAMPLES_PATH):
+            if f.endswith('.wav'):
+                samples.append(f"{TTS_SAMPLES_PATH}/{f}")
+    print(f"✅ XTTS v2 chargé avec {len(samples)} samples !")
+except Exception as e:
+    print(f"⚠️ TTS non disponible : {e}")
+    tts_model = None
+    samples = []
+
+class TTSRequest(BaseModel):
+    texte: str
+    langue: str = "fr"
+
+@app.get("/")
+async def health():
+    return {
+        "status": "ok",
+        "service": "DatoBot Wolof Service",
+        "stt": "✅ disponible" if stt_model else "❌ non disponible",
+        "tts": "✅ disponible" if tts_model else "❌ non disponible",
+        "device": str(device)
+    }
+
+@app.post("/stt")
+async def speech_to_text(audio: UploadFile = File(...)):
+    if stt_model is None:
+        raise HTTPException(status_code=503, detail="Modèle STT non disponible")
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            content = await audio.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+        audio_data, sr = librosa.load(tmp_path, sr=16000)
+        os.unlink(tmp_path)
+        inputs = stt_processor(audio_data, sampling_rate=16000, return_tensors="pt")
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        forced_decoder_ids = stt_processor.get_decoder_prompt_ids(language="french", task="transcribe")
+        with torch.no_grad():
+            predicted_ids = stt_model.generate(inputs["input_features"], forced_decoder_ids=forced_decoder_ids)
+        transcription = stt_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
+        return {"success": True, "texte": transcription, "langue": "wo", "confidence": 0.95}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/tts")
+async def text_to_speech(request: TTSRequest):
+    if tts_model is None:
+        raise HTTPException(status_code=503, detail="Modèle TTS non disponible")
+    if not request.texte.strip():
+        raise HTTPException(status_code=400, detail="Texte vide")
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            tmp_path = tmp.name
+        tts_model.tts_to_file(
+            text=request.texte,
+            speaker_wav=samples if samples else None,
+            language=request.langue,
+            file_path=tmp_path
+        )
+        return FileResponse(tmp_path, media_type="audio/wav", filename="datobot_wolof.wav")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "stt_loaded": stt_model is not None, "tts_loaded": tts_model is not None, "device": str(device)}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
