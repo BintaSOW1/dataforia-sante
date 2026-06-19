@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+transformers
+torch
+torchaudio
+librosa
+soundfile
+numpy
+python-multipart
+coqui-tts
+pydub
+protobuf
+sentencepiece
