@@ -8,21 +8,39 @@ import numpy as np
 import tempfile
 import os
 from transformers import WhisperFeatureExtractor, WhisperTokenizer, WhisperProcessor, WhisperForConditionalGeneration
+from huggingface_hub import snapshot_download
 
 app = FastAPI(title="DatoBot Wolof Service")
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"🖥️ Device : {device}")
 
-STT_MODEL_PATH = os.getenv('STT_MODEL_PATH', './models/whisper_wolof_final')
-TTS_SAMPLES_PATH = os.getenv('TTS_SAMPLES_PATH', './models/samples')
+# Télécharger les modèles depuis HuggingFace
+STT_REPO = "BintaSOW/whisper-wolof-sante"
+TTS_SAMPLES_REPO = "BintaSOW/datobot-wolof-samples"
+
+print("⏳ Téléchargement modèle Whisper depuis HuggingFace...")
+try:
+    STT_MODEL_PATH = snapshot_download(repo_id=STT_REPO)
+    print(f"✅ Whisper téléchargé : {STT_MODEL_PATH}")
+except Exception as e:
+    print(f"⚠️ Erreur téléchargement Whisper : {e}")
+    STT_MODEL_PATH = "./models/whisper_wolof_final"
+
+print("⏳ Téléchargement samples depuis HuggingFace...")
+try:
+    TTS_SAMPLES_PATH = snapshot_download(repo_id=TTS_SAMPLES_REPO)
+    print(f"✅ Samples téléchargés : {TTS_SAMPLES_PATH}")
+except Exception as e:
+    print(f"⚠️ Erreur téléchargement samples : {e}")
+    TTS_SAMPLES_PATH = "./models/samples"
 
 print("⏳ Chargement Whisper STT wolof...")
 try:
     feature_extractor = WhisperFeatureExtractor.from_pretrained(STT_MODEL_PATH)
     tokenizer = WhisperTokenizer.from_pretrained(STT_MODEL_PATH)
     stt_processor = WhisperProcessor(feature_extractor=feature_extractor, tokenizer=tokenizer)
-    stt_model = WhisperForConditionalGeneration.from_pretrained(STT_MODEL_PATH, local_files_only=True)
+    stt_model = WhisperForConditionalGeneration.from_pretrained(STT_MODEL_PATH)
     stt_model = stt_model.to(device)
     stt_model.eval()
     print("✅ Whisper STT chargé !")
@@ -80,10 +98,17 @@ async def speech_to_text(audio: UploadFile = File(...)):
         os.unlink(tmp_path)
         inputs = stt_processor(audio_data, sampling_rate=16000, return_tensors="pt")
         inputs = {k: v.to(device) for k, v in inputs.items()}
-        forced_decoder_ids = stt_processor.get_decoder_prompt_ids(language="french", task="transcribe")
+        forced_decoder_ids = stt_processor.get_decoder_prompt_ids(
+            language="french", task="transcribe"
+        )
         with torch.no_grad():
-            predicted_ids = stt_model.generate(inputs["input_features"], forced_decoder_ids=forced_decoder_ids)
-        transcription = stt_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
+            predicted_ids = stt_model.generate(
+                inputs["input_features"],
+                forced_decoder_ids=forced_decoder_ids
+            )
+        transcription = stt_processor.batch_decode(
+            predicted_ids, skip_special_tokens=True
+        )[0].strip()
         return {"success": True, "texte": transcription, "langue": "wo", "confidence": 0.95}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -109,7 +134,12 @@ async def text_to_speech(request: TTSRequest):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "stt_loaded": stt_model is not None, "tts_loaded": tts_model is not None, "device": str(device)}
+    return {
+        "status": "healthy",
+        "stt_loaded": stt_model is not None,
+        "tts_loaded": tts_model is not None,
+        "device": str(device)
+    }
 
 if __name__ == "__main__":
     import uvicorn
