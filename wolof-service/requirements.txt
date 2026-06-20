@@ -3,6 +3,7 @@ uvicorn
 transformers==4.44.0
 torch
 torchaudio
+torchcodec
 librosa
 soundfile
 numpy
