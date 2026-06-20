@@ -44,21 +44,27 @@ except Exception as e:
 print("⏳ Chargement XTTS v2...")
 try:
     os.environ["COQUI_TOS_AGREED"] = "1"
+    os.environ["USE_TORCH"] = "1"
+
     original_load = torch.load
     def patched_load(*args, **kwargs):
         kwargs['weights_only'] = False
         return original_load(*args, **kwargs)
     torch.load = patched_load
+
     from TTS.api import TTS
     tts_model = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
-    samples = [
-        f"{TTS_SAMPLES_PATH}/{f}"
-        for f in os.listdir(TTS_SAMPLES_PATH)
-        if f.endswith('.wav')
-    ]
+
+    samples = []
+    for f in os.listdir(TTS_SAMPLES_PATH):
+        if f.endswith('.wav'):
+            samples.append(f"{TTS_SAMPLES_PATH}/{f}")
+
     print(f"✅ XTTS v2 chargé avec {len(samples)} samples !")
 except Exception as e:
-    print(f"⚠️ TTS non disponible : {e}")
+    print(f"⚠️ TTS non disponible : {type(e).__name__}: {e}")
+    import traceback
+    traceback.print_exc()
     tts_model = None
     samples = []
 
