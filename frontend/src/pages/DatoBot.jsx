@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { envoyerMessage } from '../services/api';
 
+const WOLOF_STT_URL = 'https://BintaSOW-datobotwolof.hf.space/stt';
+
 export default function DatoBot() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'Bonjour ! Je suis DatoBot, votre assistant santé DataforiaSanté\n\nJe parle Français et Anglais\n\nComment puis-je vous aider ?',
+      content: 'Bonjour ! Je suis DatoBot, votre assistant santé DataforiaSanté\n\nJe parle Français, Anglais et Wolof 🇸🇳\n\nComment puis-je vous aider ?',
       suggestions: ['Je veux voir un médecin', 'Téléconsultation vidéo', 'Pharmacie près de moi', 'Hôpital disponible'],
       time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
     }
@@ -106,7 +108,77 @@ export default function DatoBot() {
     }
   }
 
+  // ═══════════════════════════════════
+  // STT WOLOF — HuggingFace Spaces
+  // ═══════════════════════════════════
+  async function enregistrerWolof() {
+    try {
+      setIsRecording(true);
+      window.speechSynthesis?.cancel();
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+
+      mediaRecorder.onstop = async () => {
+        setIsRecording(false);
+        stream.getTracks().forEach(t => t.stop());
+
+        const blob = new Blob(chunks, { type: 'audio/wav' });
+        const formData = new FormData();
+        formData.append('audio', blob, 'audio.wav');
+
+        try {
+          setLoading(true);
+          const response = await fetch(WOLOF_STT_URL, {
+            method: 'POST',
+            body: formData
+          });
+          const data = await response.json();
+
+          if (data.success && data.texte) {
+            setInput(data.texte);
+            voiceModeRef.current = true;
+            setTimeout(() => envoyer(data.texte), 300);
+          }
+        } catch (err) {
+          console.error('Erreur STT wolof:', err);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: '⚠️ Erreur de reconnaissance wolof. Réessayez.',
+            suggestions: ['Réessayer'],
+            time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          }]);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // Enregistrer 5 secondes
+      mediaRecorder.start();
+      setTimeout(() => mediaRecorder.stop(), 5000);
+
+    } catch (err) {
+      setIsRecording(false);
+      console.error('Erreur micro:', err);
+      alert('Impossible d\'accéder au microphone');
+    }
+  }
+
+  // ═══════════════════════════════════
+  // STT FR/EN — Web Speech API
+  // ═══════════════════════════════════
   function toggleVoice() {
+    // Wolof → microservice HuggingFace
+    if (voiceLang === 'wo') {
+      if (isRecording) { setIsRecording(false); return; }
+      enregistrerWolof();
+      return;
+    }
+
+    // FR/EN → Web Speech API
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
       alert(voiceLang === 'en-US' ? 'Not supported. Use Chrome.' : 'Non supporté. Utilisez Chrome.');
@@ -153,9 +225,13 @@ export default function DatoBot() {
       role: 'assistant',
       content: voiceLang === 'en-US'
         ? 'Hello! I am DatoBot, your health assistant.\n\nHow can I help you?'
+        : voiceLang === 'wo'
+        ? 'Asalaamaalekum ! Maa ngi DatoBot, sama gokh ci dëkk bi.\n\nLan laa def ngir yéggël ma ?'
         : 'Bonjour ! Je suis DatoBot, votre assistant santé.\n\nComment puis-je vous aider ?',
       suggestions: voiceLang === 'en-US'
         ? ['I want to see a doctor', 'Video consultation', 'Find a pharmacy']
+        : voiceLang === 'wo'
+        ? ['Dama bëgg gis doktoor', 'Dama am metiteu', 'Farmaasi bi']
         : ['Je veux voir un médecin', 'Téléconsultation vidéo', 'Pharmacie près de moi'],
       time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
     }]);
@@ -172,7 +248,7 @@ export default function DatoBot() {
           <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}>DatoBot</div>
           <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
-            {voiceLang === 'en-US' ? 'Health assistant · 24/7' : 'Assistant santé · 24h/24'}
+            {voiceLang === 'en-US' ? 'Health assistant · 24/7' : voiceLang === 'wo' ? 'Assistant wérëwér · 24/7 🇸🇳' : 'Assistant santé · 24h/24'}
             {isRecording && <span style={{ background: '#DC2626', color: '#fff', fontSize: '0.55rem', padding: '1px 5px', borderRadius: '6px', marginLeft: '3px' }}>🎙️</span>}
           </div>
         </div>
@@ -190,13 +266,14 @@ export default function DatoBot() {
             ⏹️
           </button>
 
-          {/* Toggle FR/EN */}
+          {/* Toggle FR/EN/WO */}
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.1)', borderRadius: '16px', padding: '2px', gap: '1px' }}>
             {[
               { lang: 'fr-FR', flag: '🇫🇷', label: 'FR' },
-              { lang: 'en-US', flag: '🇬🇧', label: 'EN' }
+              { lang: 'en-US', flag: '🇬🇧', label: 'EN' },
+              { lang: 'wo', flag: '🇸🇳', label: 'WO' }
             ].map(l => (
-              <button key={l.lang} onClick={() => setVoiceLang(l.lang)}
+              <button key={l.lang} onClick={() => { setVoiceLang(l.lang); reinitialiser(); }}
                 style={{ background: voiceLang === l.lang ? '#fff' : 'transparent', border: 'none', borderRadius: '13px', padding: '2px 8px', color: voiceLang === l.lang ? 'var(--green)' : '#fff', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--sans)', transition: 'all 0.2s' }}>
                 {l.flag} {l.label}
               </button>
@@ -282,7 +359,11 @@ export default function DatoBot() {
         <div style={{ padding: '0.4rem 1rem', background: '#FEE2E2', borderTop: '1px solid #FECACA', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#DC2626', animation: 'pulse 1s infinite' }} />
           <span style={{ fontSize: '0.75rem', color: '#DC2626', fontWeight: 600 }}>
-            {voiceLang === 'en-US' ? 'Listening... Speak now' : 'Écoute en cours... Parlez'}
+            {voiceLang === 'wo'
+              ? '🇸🇳 Dëgg naa... Wax wolof (5 secondes)'
+              : voiceLang === 'en-US'
+              ? 'Listening... Speak now'
+              : 'Écoute en cours... Parlez'}
           </span>
           <div style={{ display: 'flex', gap: '2px', alignItems: 'center', marginLeft: '4px' }}>
             {[4, 10, 14, 10, 4].map((h, i) => (
@@ -302,14 +383,14 @@ export default function DatoBot() {
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && envoyer()}
             placeholder={
               isRecording
-                ? (voiceLang === 'en-US' ? 'Listening...' : 'Écoute...')
-                : (voiceLang === 'en-US' ? 'Ask DatoBot...' : 'Posez votre question...')
+                ? (voiceLang === 'wo' ? 'Dëgg naa...' : voiceLang === 'en-US' ? 'Listening...' : 'Écoute...')
+                : (voiceLang === 'wo' ? 'Bind ci wolof...' : voiceLang === 'en-US' ? 'Ask DatoBot...' : 'Posez votre question...')
             }
             style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '0.875rem', color: 'var(--ink)', outline: 'none', fontFamily: 'var(--sans)', minWidth: 0 }}
           />
           <button onClick={toggleVoice}
-            style={{ width: '34px', height: '34px', borderRadius: '9px', border: 'none', background: isRecording ? '#DC2626' : 'var(--green-light)', color: isRecording ? '#fff' : 'var(--green)', fontSize: '0.9rem', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-            {isRecording ? '⏹️' : '🎙️'}
+            style={{ width: '34px', height: '34px', borderRadius: '9px', border: 'none', background: isRecording ? '#DC2626' : voiceLang === 'wo' ? '#006B3F' : 'var(--green-light)', color: isRecording ? '#fff' : voiceLang === 'wo' ? '#fff' : 'var(--green)', fontSize: '0.9rem', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+            {isRecording ? '⏹️' : voiceLang === 'wo' ? '🇸🇳' : '🎙️'}
           </button>
           <button onClick={() => envoyer()} disabled={loading || !input.trim()}
             style={{ width: '34px', height: '34px', borderRadius: '9px', border: 'none', background: loading || !input.trim() ? 'var(--border)' : 'var(--green)', color: '#fff', fontSize: '0.9rem', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -317,7 +398,7 @@ export default function DatoBot() {
           </button>
         </div>
         <div style={{ textAlign: 'center', fontSize: '0.6rem', color: 'var(--ink-3)', marginTop: '4px' }}>
-          {voiceLang === 'en-US' ? 'For emergencies call 15.' : 'Pour les urgences appelez le 15.'}
+          {voiceLang === 'wo' ? 'Wolof STT · HuggingFace 🇸🇳' : voiceLang === 'en-US' ? 'For emergencies call 15.' : 'Pour les urgences appelez le 15.'}
         </div>
       </div>
 
