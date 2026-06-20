@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-transformers
+transformers==4.44.0
 torch
 torchaudio
 librosa
@@ -10,5 +10,5 @@ python-multipart
 huggingface_hub
 sentencepiece
 protobuf
-coqui-tts
+TTS
 pydub
