@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { envoyerMessage } from '../services/api';
 
-const WOLOF_STT_URL = 'https://BintaSOW-datobotwolof.hf.space/stt';
+const WOLOF_STT_URL = 'https://wolof-service-production.up.railway.app/stt';
+const WOLOF_TTS_URL = 'https://wolof-service-production.up.railway.app/tts';
 
 export default function DatoBot() {
   const [messages, setMessages] = useState([
@@ -67,6 +68,91 @@ export default function DatoBot() {
     }, 100);
   }
 
+  async function speakTextWolof(text) {
+    if (voiceLang !== 'wo') {
+      speakText(text);
+      return;
+    }
+    try {
+      const response = await fetch(WOLOF_TTS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texte: nettoyerTexte(text), langue: 'fr' })
+      });
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audio.play();
+    } catch (err) {
+      console.error('Erreur TTS wolof:', err);
+      speakText(text);
+    }
+  }
+
+  async function envoyerFeedback(messageUser, reponseBot, feedback, correction = null) {
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message_utilisateur: messageUser,
+          reponse_datobot: reponseBot,
+          reponse_corrigee: correction,
+          feedback,
+          session_id: sessionId
+        })
+      });
+      console.log(`✅ Feedback ${feedback} sauvegardé`);
+    } catch (err) {
+      console.error('Erreur feedback:', err);
+    }
+  }
+
+  async function enregistrerCorrectionVocale(messageUser, reponseBot) {
+    try {
+      setIsRecording(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus' : 'audio/webm';
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const chunks = [];
+
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+      mediaRecorder.onstop = async () => {
+        setIsRecording(false);
+        stream.getTracks().forEach(t => t.stop());
+
+        const blob = new Blob(chunks, { type: mimeType });
+        const formData = new FormData();
+        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+        formData.append('audio', blob, `correction.${ext}`);
+
+        try {
+          const response = await fetch(WOLOF_STT_URL, {
+            method: 'POST',
+            body: formData
+          });
+          const data = await response.json();
+
+          if (data.success && data.texte) {
+            await envoyerFeedback(messageUser, reponseBot, 'mauvais', data.texte);
+            alert(`✅ Correction sauvegardée : "${data.texte}"`);
+          }
+        } catch (err) {
+          console.error('Erreur correction vocale:', err);
+        }
+      };
+
+      mediaRecorder.start(100);
+      setTimeout(() => mediaRecorder.stop(), 5000);
+
+    } catch (err) {
+      setIsRecording(false);
+      console.error('Erreur micro:', err);
+    }
+  }
+
   async function envoyer(texte) {
     const msg = texte || input.trim();
     if (!msg || loading) return;
@@ -92,7 +178,7 @@ export default function DatoBot() {
         time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, botMsg]);
-      setTimeout(() => speakText(reply), 500);
+      setTimeout(() => speakTextWolof(reply), 500);
     } catch (err) {
       const errMsg = voiceLang === 'en-US'
         ? 'Sorry, technical issue. Please try again.'
@@ -108,27 +194,31 @@ export default function DatoBot() {
     }
   }
 
-  // ═══════════════════════════════════
-  // STT WOLOF — HuggingFace Spaces
-  // ═══════════════════════════════════
   async function enregistrerWolof() {
     try {
       setIsRecording(true);
       window.speechSynthesis?.cancel();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4';
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       const chunks = [];
 
-      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
       mediaRecorder.onstop = async () => {
         setIsRecording(false);
         stream.getTracks().forEach(t => t.stop());
 
-        const blob = new Blob(chunks, { type: 'audio/wav' });
+        const blob = new Blob(chunks, { type: mimeType });
         const formData = new FormData();
-        formData.append('audio', blob, 'audio.wav');
+        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+        formData.append('audio', blob, `audio.${ext}`);
 
         try {
           setLoading(true);
@@ -156,8 +246,7 @@ export default function DatoBot() {
         }
       };
 
-      // Enregistrer 5 secondes
-      mediaRecorder.start();
+      mediaRecorder.start(100);
       setTimeout(() => mediaRecorder.stop(), 5000);
 
     } catch (err) {
@@ -167,18 +256,13 @@ export default function DatoBot() {
     }
   }
 
-  // ═══════════════════════════════════
-  // STT FR/EN — Web Speech API
-  // ═══════════════════════════════════
   function toggleVoice() {
-    // Wolof → microservice HuggingFace
     if (voiceLang === 'wo') {
       if (isRecording) { setIsRecording(false); return; }
       enregistrerWolof();
       return;
     }
 
-    // FR/EN → Web Speech API
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
       alert(voiceLang === 'en-US' ? 'Not supported. Use Chrome.' : 'Non supporté. Utilisez Chrome.');
@@ -226,12 +310,12 @@ export default function DatoBot() {
       content: voiceLang === 'en-US'
         ? 'Hello! I am DatoBot, your health assistant.\n\nHow can I help you?'
         : voiceLang === 'wo'
-        ? 'Asalaamaalekum ! Maa ngi DatoBot, sama gokh ci dëkk bi.\n\nLan laa def ngir yéggël ma ?'
+        ? 'Asalaamaalekum ! Maanela DatoBot, sa assistant ci wérguyaram .\n\nNane laay deef guir dimbalila laa  ?'
         : 'Bonjour ! Je suis DatoBot, votre assistant santé.\n\nComment puis-je vous aider ?',
       suggestions: voiceLang === 'en-US'
         ? ['I want to see a doctor', 'Video consultation', 'Find a pharmacy']
         : voiceLang === 'wo'
-        ? ['Dama bëgg gis doktoor', 'Dama am metiteu', 'Farmaasi bi']
+        ? ['Dama bëgg gis doktoor', 'Dama bëgg seet sama yaram sama ker ', 'Farmaasi bi diégué sama ker']
         : ['Je veux voir un médecin', 'Téléconsultation vidéo', 'Pharmacie près de moi'],
       time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
     }]);
@@ -254,19 +338,14 @@ export default function DatoBot() {
         </div>
 
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
-          {/* Test son */}
           <button onClick={() => speakText('Bonjour je suis DatoBot')}
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '4px 8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.65rem', cursor: 'pointer', fontFamily: 'var(--sans)' }}>
             🔊
           </button>
-
-          {/* Stop */}
           <button onClick={() => window.speechSynthesis?.cancel()}
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '4px 8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.65rem', cursor: 'pointer', fontFamily: 'var(--sans)' }}>
             ⏹️
           </button>
-
-          {/* Toggle FR/EN/WO */}
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.1)', borderRadius: '16px', padding: '2px', gap: '1px' }}>
             {[
               { lang: 'fr-FR', flag: '🇫🇷', label: 'FR' },
@@ -279,8 +358,6 @@ export default function DatoBot() {
               </button>
             ))}
           </div>
-
-          {/* Reset */}
           <button onClick={reinitialiser}
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '4px 8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.65rem', cursor: 'pointer', fontFamily: 'var(--sans)' }}>
             🔄
@@ -311,7 +388,7 @@ export default function DatoBot() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                   <span style={{ fontSize: '0.58rem', color: 'var(--ink-3)' }}>{msg.time}</span>
                   {msg.role === 'assistant' && (
-                    <button onClick={() => speakText(msg.content)}
+                    <button onClick={() => speakTextWolof(msg.content)}
                       style={{ background: 'none', border: 'none', color: 'var(--ink-3)', cursor: 'pointer', fontSize: '0.65rem', padding: '0 1px' }}>
                       🔊
                     </button>
@@ -334,6 +411,30 @@ export default function DatoBot() {
                     {s}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* Feedback wolof */}
+            {msg.role === 'assistant' && voiceLang === 'wo' && i > 0 && i === messages.length - 1 && !loading && (
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px', marginLeft: '35px' }}>
+                <button
+                  onClick={() => envoyerFeedback(messages[i-1]?.content, msg.content, 'bon')}
+                  style={{ background: '#D1FAE5', border: '1px solid #6EE7B7', borderRadius: '10px', padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: '#065F46' }}>
+                  👍 Dëgg na
+                </button>
+                <button
+                  onClick={() => {
+                    const correction = prompt('Saisit la bonne réponse en wolof :');
+                    if (correction) envoyerFeedback(messages[i-1]?.content, msg.content, 'mauvais', correction);
+                  }}
+                  style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '10px', padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: '#991B1B' }}>
+                  👎 Soppiku
+                </button>
+                <button
+                  onClick={() => enregistrerCorrectionVocale(messages[i-1]?.content, msg.content)}
+                  style={{ background: '#EDE9FE', border: '1px solid #C4B5FD', borderRadius: '10px', padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: '#5B21B6' }}>
+                  🎙️ Wax correction bi
+                </button>
               </div>
             )}
           </div>
@@ -398,7 +499,7 @@ export default function DatoBot() {
           </button>
         </div>
         <div style={{ textAlign: 'center', fontSize: '0.6rem', color: 'var(--ink-3)', marginTop: '4px' }}>
-          {voiceLang === 'wo' ? 'Wolof STT · HuggingFace 🇸🇳' : voiceLang === 'en-US' ? 'For emergencies call 15.' : 'Pour les urgences appelez le 15.'}
+          {voiceLang === 'wo' ? 'Wolof STT · Railway 🇸🇳' : voiceLang === 'en-US' ? 'For emergencies call 15.' : 'Pour les urgences appelez le 15.'}
         </div>
       </div>
 
