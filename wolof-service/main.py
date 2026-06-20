@@ -127,16 +127,26 @@ async def text_to_speech(request: TTSRequest):
     if not request.texte.strip():
         raise HTTPException(status_code=400, detail="Texte vide")
     try:
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-            tmp_path = tmp.name
+        print(f"🔊 Génération TTS pour : {request.texte[:50]}")
+        tmp_path = f"/tmp/tts_{os.getpid()}.wav"
+
         tts_model.tts_to_file(
             text=request.texte,
             speaker_wav=samples if samples else None,
             language=request.langue,
             file_path=tmp_path
         )
-        return FileResponse(tmp_path, media_type="audio/wav", filename="datobot_wolof.wav")
+
+        print(f"✅ TTS généré : {tmp_path}")
+        return FileResponse(
+            tmp_path,
+            media_type="audio/wav",
+            filename="datobot_wolof.wav"
+        )
     except Exception as e:
+        print(f"❌ Erreur TTS : {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
