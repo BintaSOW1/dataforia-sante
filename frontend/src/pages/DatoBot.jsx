@@ -91,7 +91,7 @@ export default function DatoBot() {
 
   async function envoyerFeedback(messageUser, reponseBot, feedback, correction = null) {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/api/feedback`, {
+        await fetch(`${import.meta.env.VITE_API_URL}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

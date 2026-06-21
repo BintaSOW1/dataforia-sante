@@ -7,8 +7,23 @@ import tempfile
 import os
 from transformers import WhisperFeatureExtractor, WhisperTokenizer, WhisperProcessor, WhisperForConditionalGeneration
 from huggingface_hub import snapshot_download
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+# ... reste des imports
 
 app = FastAPI(title="DatoBot Wolof Service")
+
+# Ajouter CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"🖥️ Device : {device}")
