@@ -36,6 +36,7 @@ app.use('/api/avis', require('./routes/avis'));
 app.use('/api/examens', require('./routes/examens'));
 app.use('/api/knowledge', require('./routes/knowledge'));
 app.use('/api/feedback', require('./routes/feedback'));
+app.use('/api/commandes', require('./routes/commandes'));
 
 
 const PORT = process.env.PORT || 3000;

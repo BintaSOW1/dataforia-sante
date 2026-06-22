@@ -290,7 +290,54 @@ MÉDECINS DISPONIBLES SUR DATAFORIASTÉ
 - Dr. Aissatou Fall — Neurologue — Dakar Plateau — 20 000 FCFA — id: 6
 
 CRÉNEAUX : 08h30, 09h00, 10h00, 10h30, 11h30, 14h00, 15h00, 15h30, 16h30, 17h00
+═══════════════════════════════════════
+MÉDICAMENTS DISPONIBLES (COMMANDE EN LIGNE)
+═══════════════════════════════════════
+L utilisateur peut commander des médicaments directement via DatoBot.
+Médicaments disponibles :
+- Paracétamol 500mg — 500 FCFA
+- Paracétamol 1000mg — 800 FCFA
+- Ibuprofène 400mg — 1500 FCFA
+- Amoxicilline 500mg — 3500 FCFA (ordonnance)
+- Coartem Artéméther — 5000 FCFA (ordonnance)
+- Metformine 500mg — 2000 FCFA (ordonnance)
+- Amlodipine 5mg — 3000 FCFA (ordonnance)
+- Acide folique 5mg — 1000 FCFA
+- Fer Acide folique — 1500 FCFA
+- ORS SRO — 300 FCFA
+- Zinc 20mg — 1000 FCFA
+- Vitamine C 500mg — 800 FCFA
+- Mebendazole 500mg — 1500 FCFA
+- Chloroquine 100mg — 2000 FCFA (ordonnance)
+- Doxycycline 100mg — 4000 FCFA (ordonnance)
 
+PROCESSUS DE COMMANDE :
+1. User demande un médicament
+2. Tu confirmes le médicament et le prix
+3. Tu demandes : nom, téléphone, adresse, quantité
+4. Tu confirmes la commande
+5. Tu déclenches l action commander_medicament
+
+FORMAT ACTION COMMANDE :
+{
+  "message": "✅ Commande confirmée ! Paracétamol 500mg x2 = 1000 FCFA. Livraison sous 30-60 min.",
+  "suggestions": ["Voir ma commande", "Commander autre chose", "Retour accueil"],
+  "action": {
+    "type": "commander_medicament",
+    "data": {
+      "patient_nom": "Fatou Diallo",
+      "patient_tel": "77 123 45 67",
+      "patient_adresse": "Dakar Plateau",
+      "medicament_nom": "Paracétamol 500mg",
+      "quantite": 2,
+      "prix_total": 1000,
+      "pharmacie_nom": "Pharmacie la plus proche",
+      "mode_livraison": "livraison"
+    }
+  },
+  "urgence": false,
+  "niveau_triage": 4
+}
 ═══════════════════════════════════════
 RÈGLES DE COMMUNICATION
 ═══════════════════════════════════════
@@ -527,6 +574,51 @@ ${contexteMedical}`;
         } catch (errRdv) {
           console.error('Erreur création RDV:', errRdv.message);
           reply = parsed.message + '\n\n⚠️ RDV enregistré mais erreur. Appelez le cabinet pour confirmer.';
+        }
+      }
+      if (action && action.type === 'commander_medicament') {
+        try {
+          const cmdData = action.data;
+          const { data: commande, error } = await supabaseAdmin
+            .from('commandes_medicaments')
+            .insert({
+              patient_nom: cmdData.patient_nom,
+              patient_tel: cmdData.patient_tel,
+              patient_adresse: cmdData.patient_adresse || '',
+              medicament_nom: cmdData.medicament_nom,
+              quantite: cmdData.quantite || 1,
+              prix_total: cmdData.prix_total,
+              pharmacie_nom: cmdData.pharmacie_nom || 'Pharmacie la plus proche',
+              mode_livraison: cmdData.mode_livraison || 'livraison',
+              statut: 'en_attente',
+              session_id: sessionId
+            })
+            .select()
+            .single();
+      
+          if (error) throw error;
+      
+          // Notifier via webhook Make
+          if (process.env.MAKE_WEBHOOK_URL && commande) {
+            await axios.post(process.env.MAKE_WEBHOOK_URL, {
+              type: 'commande_medicament',
+              commande_id: commande.id,
+              patient_nom: cmdData.patient_nom,
+              patient_tel: cmdData.patient_tel,
+              medicament_nom: cmdData.medicament_nom,
+              quantite: cmdData.quantite,
+              prix_total: cmdData.prix_total,
+              pharmacie_nom: cmdData.pharmacie_nom,
+              mode_livraison: cmdData.mode_livraison
+            }).catch(err => console.error('Webhook error:', err.message));
+          }
+      
+          reply = parsed.message + `\n\n🔖 Référence commande : #${commande.id}`;
+          console.log(`💊 Commande médicament créée : ${cmdData.medicament_nom} — ID: ${commande.id}`);
+      
+        } catch (errCmd) {
+          console.error('Erreur commande médicament:', errCmd.message);
+          reply = parsed.message + '\n\n⚠️ Commande enregistrée mais erreur. Appelez la pharmacie pour confirmer.';
         }
       }
     } catch {
