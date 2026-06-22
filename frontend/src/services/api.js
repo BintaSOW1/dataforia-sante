@@ -25,7 +25,7 @@ export const annulerRdv = (id) => API.patch(`/rdv/${id}/annuler`);
 
 // ── CHAT ──
 export const envoyerMessage = (message, sessionId, location = null) => {
-  return api.post('/chat', {
+  return API.post('/chat', {
     message,
     session_id: sessionId,
     location: location ? {
