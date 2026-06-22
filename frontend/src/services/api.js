@@ -24,8 +24,16 @@ export const getRdv = (filtres = {}) => API.get('/rdv', { params: filtres });
 export const annulerRdv = (id) => API.patch(`/rdv/${id}/annuler`);
 
 // ── CHAT ──
-export const envoyerMessage = (message, session_id) =>
-  API.post('/chat', { message, session_id });
+export const envoyerMessage = (message, sessionId, location = null) => {
+  return api.post('/chat', {
+    message,
+    session_id: sessionId,
+    location: location ? {
+      lat: location.lat,
+      lng: location.lng
+    } : null
+  });
+};
 
 // ── ORDONNANCES ──
 export const envoyerOrdonnance = (data) => API.post('/ordonnances', data);

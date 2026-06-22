@@ -35,8 +35,8 @@ function detecterUrgence(message) {
     'hémorragie', 'bleeding', 'avc', 'stroke', 'paralysie',
     'difficultés respirer', 'cannot breathe', 'saignement abondant',
     'accouchement imminent', 'suicide', 'me faire du mal',
-    'deuneu buy metti', 'kheum', 'meunoul nooyi', 'deerett bou bari', 'weusiin', 'kharou','metiteu ci sama dënn',
-    'metiteu ci dënn','sama dënn buy metti'
+    'deuneu buy metti', 'kheum', 'meunoul nooyi', 'deerett bou bari', 'weusiin', 'kharou',
+    'metiteu ci sama dënn', 'metiteu ci dënn', 'sama dënn buy metti'
   ];
   return motsUrgence.some(mot => msg.includes(mot));
 }
@@ -44,10 +44,10 @@ function detecterUrgence(message) {
 function detecterIntention(message) {
   const msg = message.toLowerCase();
   const intentions = {
-    urgence: ['urgent', 'urgence', 'emergency', 'vite', 'immédiatement', 'urgence','gaw', 'legui legui'],
-    rdv: ['rendez-vous', 'rdv', 'prendre rdv', 'consulter', 'voir un médecin', 'appointment', 'book', 'rendewu','sett', 'giss dockor'],
-    symptomes: ['j\'ai mal', 'douleur', 'fièvre', 'symptôme', 'souffre', 'pain', 'hurt', 'feel sick', 'dema am metitt','metiteu','tangu','màndarga','sonn'],
-    pharmacie: ['médicament', 'pharmacie', 'ordonnance', 'medicine', 'pharmacy'],
+    urgence: ['urgent', 'urgence', 'emergency', 'vite', 'immédiatement', 'gaw', 'legui legui'],
+    rdv: ['rendez-vous', 'rdv', 'prendre rdv', 'consulter', 'voir un médecin', 'appointment', 'book', 'rendewu', 'sett', 'giss dockor'],
+    symptomes: ['j\'ai mal', 'douleur', 'fièvre', 'symptôme', 'souffre', 'pain', 'hurt', 'feel sick', 'dema am metitt', 'metiteu', 'tangu', 'màndarga', 'sonn'],
+    pharmacie: ['médicament', 'pharmacie', 'ordonnance', 'medicine', 'pharmacy', 'commander', 'acheter', 'comprimé'],
     hopital: ['hôpital', 'clinique', 'urgences', 'hospital'],
     information: ['comment', 'pourquoi', 'qu\'est ce', 'what is', 'how to', 'prévenir', 'naka', 'lu tax', 'fagaru'],
     teleconsult: ['vidéo', 'téléconsultation', 'video call', 'en ligne', 'online'],
@@ -64,10 +64,10 @@ function extraireEntites(message) {
   const entites = { symptomes: [], duree: null, localisation: null, intensite: null };
 
   const symptomes = [
-    'fièvre', 'fever','tangor', 'toux', 'cough','seukeut','douleur', 'pain','metiteu',
-    'vomissement','wothiou', 'nausée', 'diarrhée','birr bouy daw', 'fatigue', 'sonneu', 'frissons',
-    'maux de tête', 'headache', 'bopp bouy metti', 'essoufflement', 'vertiges','mirr',
-    'éruption', 'démangeaisons', 'sang', 'derett','gonflement', 'neewi'
+    'fièvre', 'fever', 'tangor', 'toux', 'cough', 'seukeut', 'douleur', 'pain', 'metiteu',
+    'vomissement', 'wothiou', 'nausée', 'diarrhée', 'birr bouy daw', 'fatigue', 'sonneu', 'frissons',
+    'maux de tête', 'headache', 'bopp bouy metti', 'essoufflement', 'vertiges', 'mirr',
+    'éruption', 'démangeaisons', 'sang', 'derett', 'gonflement', 'neewi'
   ];
   symptomes.forEach(s => { if (msg.includes(s)) entites.symptomes.push(s); });
 
@@ -81,12 +81,12 @@ function extraireEntites(message) {
     if (match) { entites.duree = `${match[1]} ${match[2]}`; break; }
   }
 
-  const localisations = ['poitrine', 'chest','dënn', 'tête', 'head','bopp', 'ventre', 'stomach','birr', 'dos', 'back','ganaaw','jambe', 'leg', 'tank', 'bras', 'arm','lokho', 'gorge', 'throat','put' ];
+  const localisations = ['poitrine', 'chest', 'dënn', 'tête', 'head', 'bopp', 'ventre', 'stomach', 'birr', 'dos', 'back', 'ganaaw', 'jambe', 'leg', 'tank', 'bras', 'arm', 'lokho', 'gorge', 'throat', 'put'];
   localisations.forEach(loc => { if (msg.includes(loc)) entites.localisation = loc; });
 
   if (msg.includes('fort') || msg.includes('intense') || msg.includes('severe') || msg.includes('insupportable') || msg.includes('bu bax')) {
     entites.intensite = 'intense';
-  } else if (msg.includes('léger') || msg.includes('petit') || msg.includes('mild')|| msg.includes('tuuti')) {
+  } else if (msg.includes('léger') || msg.includes('petit') || msg.includes('mild') || msg.includes('tuuti')) {
     entites.intensite = 'léger';
   } else {
     entites.intensite = 'modéré';
@@ -99,7 +99,7 @@ function calculerGravite(message, urgence, entites) {
   if (urgence) return 10;
   let score = 0;
   if (entites.duree) {
-    if (entites.duree.includes('semaine') || entites.duree.includes('week') ||entites.duree.includes('ayu-bés')) score += 3;
+    if (entites.duree.includes('semaine') || entites.duree.includes('week') || entites.duree.includes('ayu-bés')) score += 3;
     else if (entites.duree.includes('jour') || entites.duree.includes('day') || entites.duree.includes('fan')) score += 2;
     else score += 1;
   }
@@ -113,12 +113,12 @@ function calculerGravite(message, urgence, entites) {
 function suggererSpecialite(message) {
   const msg = message.toLowerCase();
   const specialites = {
-    cardiologue: ['coeur', 'cardiaque', 'poitrine', 'tension', 'heart', 'chest','xol','cardiak','dënn', 'tensiyón'],
+    cardiologue: ['coeur', 'cardiaque', 'poitrine', 'tension', 'heart', 'chest', 'xol', 'cardiak', 'dënn', 'tensiyón'],
     pediatre: ['enfant', 'bébé', 'child', 'baby', 'kid', 'nourrisson', 'xale', 'dom', 'guné'],
-    gynecologue: ['grossesse', 'règles', 'gynéco', 'pregnancy', 'menstruation', 'ëmb','baaxu jigéen'],
+    gynecologue: ['grossesse', 'règles', 'gynéco', 'pregnancy', 'menstruation', 'ëmb', 'baaxu jigéen'],
     dermatologue: ['peau', 'bouton', 'éruption', 'skin', 'rash', 'acné', 'der', 'pitieu'],
-    neurologue: ['tête', 'migraine', 'neurologie', 'head', 'headache', 'nerve', 'bopp' ],
-    generaliste: ['fièvre', 'toux', 'rhume', 'grippe', 'fever', 'cold', 'flu','tangor', 'seukeut', 'sotieu']
+    neurologue: ['tête', 'migraine', 'neurologie', 'head', 'headache', 'nerve', 'bopp'],
+    generaliste: ['fièvre', 'toux', 'rhume', 'grippe', 'fever', 'cold', 'flu', 'tangor', 'seukeut', 'sotieu']
   };
   for (const [spec, mots] of Object.entries(specialites)) {
     if (mots.some(mot => msg.includes(mot))) return spec;
@@ -200,7 +200,7 @@ TECHNIQUE 1 — CHAIN OF THOUGHT (RAISONNEMENT)
 ═══════════════════════════════════════
 Avant de répondre, analyse mentalement (sans l'écrire) :
 1. Quelle est l'intention de l'utilisateur ?
-   → RDV | Symptômes | Information | Urgence | Pharmacie | Examens
+   → RDV | Symptômes | Information | Urgence | Pharmacie | Examens | Commande médicament
 2. Y a-t-il des mots d'urgence ?
    → Si oui → urgence: true + recommander le 15
 3. Quelle spécialité est concernée ?
@@ -266,7 +266,7 @@ NIVEAU 3 — CONSULTATION NORMALE
 → Rhume, toux légère, maux de tête
 
 NIVEAU 4 — CONSEIL / INFORMATION
-→ Questions générales, prévention
+→ Questions générales, prévention, commande médicaments
 
 ═══════════════════════════════════════
 TECHNIQUE 5 — SPÉCIALISTES & ORIENTATION
@@ -290,6 +290,7 @@ MÉDECINS DISPONIBLES SUR DATAFORIASTÉ
 - Dr. Aissatou Fall — Neurologue — Dakar Plateau — 20 000 FCFA — id: 6
 
 CRÉNEAUX : 08h30, 09h00, 10h00, 10h30, 11h30, 14h00, 15h00, 15h30, 16h30, 17h00
+
 ═══════════════════════════════════════
 MÉDICAMENTS DISPONIBLES (COMMANDE EN LIGNE)
 ═══════════════════════════════════════
@@ -298,25 +299,29 @@ Médicaments disponibles :
 - Paracétamol 500mg — 500 FCFA
 - Paracétamol 1000mg — 800 FCFA
 - Ibuprofène 400mg — 1500 FCFA
-- Amoxicilline 500mg — 3500 FCFA (ordonnance)
-- Coartem Artéméther — 5000 FCFA (ordonnance)
-- Metformine 500mg — 2000 FCFA (ordonnance)
-- Amlodipine 5mg — 3000 FCFA (ordonnance)
+- Amoxicilline 500mg — 3500 FCFA (ordonnance requise)
+- Coartem Artéméther — 5000 FCFA (ordonnance requise)
+- Metformine 500mg — 2000 FCFA (ordonnance requise)
+- Amlodipine 5mg — 3000 FCFA (ordonnance requise)
 - Acide folique 5mg — 1000 FCFA
 - Fer Acide folique — 1500 FCFA
 - ORS SRO — 300 FCFA
 - Zinc 20mg — 1000 FCFA
 - Vitamine C 500mg — 800 FCFA
 - Mebendazole 500mg — 1500 FCFA
-- Chloroquine 100mg — 2000 FCFA (ordonnance)
-- Doxycycline 100mg — 4000 FCFA (ordonnance)
+- Chloroquine 100mg — 2000 FCFA (ordonnance requise)
+- Doxycycline 100mg — 4000 FCFA (ordonnance requise)
 
 PROCESSUS DE COMMANDE :
 1. User demande un médicament
 2. Tu confirmes le médicament et le prix
-3. Tu demandes : nom, téléphone, adresse, quantité
-4. Tu confirmes la commande
-5. Tu déclenches l action commander_medicament
+3. Si ordonnance requise → demande si user a une ordonnance
+4. Tu demandes : nom, téléphone, adresse, quantité
+5. Tu confirmes la commande
+6. Tu déclenches l action commander_medicament
+
+Si [PHARMACIES PROCHES] disponibles dans le contexte → mentionne la pharmacie la plus proche
+Si [MÉDICAMENTS DISPONIBLES] dans le contexte → utilise ces informations
 
 FORMAT ACTION COMMANDE :
 {
@@ -338,6 +343,7 @@ FORMAT ACTION COMMANDE :
   "urgence": false,
   "niveau_triage": 4
 }
+
 ═══════════════════════════════════════
 RÈGLES DE COMMUNICATION
 ═══════════════════════════════════════
@@ -446,23 +452,33 @@ User: "sama bop buy metti te dema am tangor [CONTEXTE: langue: wo, intention: sy
 }
 
 Exemple 6 — Wolof urgence :
-User: " sama dënn bi moy metti bu baxxa bax  [CONTEXTE: langue: wo, urgence: true, gravite: 10]"
+User: "sama dënn bi moy metti bu baxxa bax [CONTEXTE: langue: wo, urgence: true, gravite: 10]"
 {
   "message": "🚨 Urgence la ! wotel ci 15 (SAMU) léegi léegi ! bul nek yoe kesse !",
-  "suggestions": [" Wotel ci 15", "Walla ci 18", "Appeler le 15"],
+  "suggestions": ["Wotel ci 15", "Walla ci 18", "Appeler le 15"],
   "action": null,
   "urgence": true,
   "specialite_detectee": "cardiologie",
   "niveau_triage": 1
+}
+
+Exemple 7 — Commande médicament :
+User: "je veux commander du Paracétamol 500mg [CONTEXTE: intention: pharmacie]"
+{
+  "message": "Paracétamol 500mg disponible à 500 FCFA la boîte. Combien de boîtes souhaitez-vous ? Et quel est votre nom et numéro de téléphone pour la livraison ? 💊",
+  "suggestions": ["1 boîte", "2 boîtes", "3 boîtes"],
+  "action": null,
+  "urgence": false,
+  "specialite_detectee": "generaliste",
+  "niveau_triage": 4
 }`;
 
 // ═══════════════════════════════════
 // ROUTES
 // ═══════════════════════════════════
 
-// POST /api/chat
 router.post('/', async (req, res) => {
-  const { message, session_id } = req.body;
+  const { message, session_id, location } = req.body;
   if (!message) return res.status(400).json({ success: false, message: 'Message manquant' });
 
   const sessionId = session_id || 'default';
@@ -472,24 +488,66 @@ router.post('/', async (req, res) => {
   // PREPROCESSING
   const analyse = preprocessMessage(message);
   console.log('📊 Preprocessing:', JSON.stringify(analyse));
-  // RAG — Recherche dans la base de connaissances
-let contexteMedical = '';
-try {
-  const docs = await rechercherKnowledge(message);
-  if (docs && docs.length > 0) {
-    contexteMedical = `\n\n[BASE DE CONNAISSANCES MÉDICALES SÉNÉGAL]\n`;
-    docs.forEach(doc => {
-      contexteMedical += `\n--- ${doc.titre} (pertinence: ${Math.round(doc.similarity * 100)}%) ---\n`;
-      contexteMedical += doc.contenu.substring(0, 500) + '...\n';
-    });
-    console.log(`📚 RAG: ${docs.length} document(s) trouvé(s)`);
-  }
-} catch (err) {
-  console.error('Erreur RAG:', err);
-}
 
-// Message enrichi avec contexte preprocessing + RAG
-const messageEnrichi = `${message}
+  // RAG — Recherche dans la base de connaissances
+  let contexteMedical = '';
+  try {
+    const docs = await rechercherKnowledge(message);
+    if (docs && docs.length > 0) {
+      contexteMedical = `\n\n[BASE DE CONNAISSANCES MÉDICALES SÉNÉGAL]\n`;
+      docs.forEach(doc => {
+        contexteMedical += `\n--- ${doc.titre} (pertinence: ${Math.round(doc.similarity * 100)}%) ---\n`;
+        contexteMedical += doc.contenu.substring(0, 500) + '...\n';
+      });
+      console.log(`📚 RAG: ${docs.length} document(s) trouvé(s)`);
+    }
+  } catch (err) {
+    console.error('Erreur RAG:', err);
+  }
+
+  // PHARMACIES PROCHES (si localisation disponible)
+  let contextePharmacie = '';
+  if (location && location.lat && location.lng) {
+    try {
+      const query = `[out:json][timeout:10];node["amenity"="pharmacy"](around:2000,${location.lat},${location.lng});out 3;`;
+      const overpassResponse = await fetch(
+        `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`
+      );
+      const overpassData = await overpassResponse.json();
+
+      if (overpassData.elements && overpassData.elements.length > 0) {
+        contextePharmacie = `\n\n[PHARMACIES PROCHES DE L'UTILISATEUR]\n`;
+        overpassData.elements.slice(0, 3).forEach((pharmacy, idx) => {
+          const nom = pharmacy.tags?.name || `Pharmacie ${idx + 1}`;
+          contextePharmacie += `→ ${nom}\n`;
+        });
+      }
+
+      // Médicaments disponibles si pertinent
+      const msgLower = message.toLowerCase();
+      const medicamentsMots = ['médicament', 'paracétamol', 'ibuprofène', 'amoxicilline',
+        'commander', 'acheter', 'pharmacie', 'medicament', 'comprimé'];
+
+      if (medicamentsMots.some(mot => msgLower.includes(mot))) {
+        const { data: medicaments } = await supabaseAdmin
+          .from('medicaments')
+          .select('nom, prix, categorie')
+          .order('nom');
+
+        if (medicaments && medicaments.length > 0) {
+          contextePharmacie += `\n[MÉDICAMENTS DISPONIBLES EN LIGNE]\n`;
+          medicaments.forEach(med => {
+            contextePharmacie += `→ ${med.nom} — ${med.prix} FCFA\n`;
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Erreur géolocalisation pharmacies:', err);
+    }
+  }
+
+  // Message enrichi avec contexte preprocessing + RAG + Localisation
+  const messageEnrichi = `${message}
 
 [CONTEXTE DÉTECTÉ AUTOMATIQUEMENT]
 - Langue: ${analyse.langue}
@@ -499,13 +557,12 @@ const messageEnrichi = `${message}
 - Spécialité suggérée: ${analyse.specialite}
 - Symptômes: ${analyse.entites.symptomes.join(', ') || 'aucun'}
 - Durée: ${analyse.entites.duree || 'non précisée'}
-- Localisation: ${analyse.entites.localisation || 'non précisée'}
+- Localisation corps: ${analyse.entites.localisation || 'non précisée'}
 - Intensité: ${analyse.entites.intensite || 'non précisée'}
-${contexteMedical}`;
+- Position GPS: ${location ? `${location.lat}, ${location.lng}` : 'non disponible'}
+${contexteMedical}
+${contextePharmacie}`;
 
-
-
- 
   historique.push({ role: 'user', content: messageEnrichi });
   if (historique.length > 20) historique.splice(0, 2);
 
@@ -529,6 +586,7 @@ ${contexteMedical}`;
       suggestions = parsed.suggestions || [];
       action = parsed.action || null;
 
+      // ACTION — Créer RDV
       if (action && action.type === 'creer_rdv') {
         try {
           const rdvData = action.data;
@@ -576,6 +634,8 @@ ${contexteMedical}`;
           reply = parsed.message + '\n\n⚠️ RDV enregistré mais erreur. Appelez le cabinet pour confirmer.';
         }
       }
+
+      // ACTION — Commander médicament
       if (action && action.type === 'commander_medicament') {
         try {
           const cmdData = action.data;
@@ -595,10 +655,9 @@ ${contexteMedical}`;
             })
             .select()
             .single();
-      
+
           if (error) throw error;
-      
-          // Notifier via webhook Make
+
           if (process.env.MAKE_WEBHOOK_URL && commande) {
             await axios.post(process.env.MAKE_WEBHOOK_URL, {
               type: 'commande_medicament',
@@ -612,15 +671,16 @@ ${contexteMedical}`;
               mode_livraison: cmdData.mode_livraison
             }).catch(err => console.error('Webhook error:', err.message));
           }
-      
+
           reply = parsed.message + `\n\n🔖 Référence commande : #${commande.id}`;
           console.log(`💊 Commande médicament créée : ${cmdData.medicament_nom} — ID: ${commande.id}`);
-      
+
         } catch (errCmd) {
           console.error('Erreur commande médicament:', errCmd.message);
           reply = parsed.message + '\n\n⚠️ Commande enregistrée mais erreur. Appelez la pharmacie pour confirmer.';
         }
       }
+
     } catch {
       reply = texte;
       suggestions = [];

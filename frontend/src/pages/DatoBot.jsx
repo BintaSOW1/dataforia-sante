@@ -19,6 +19,7 @@ export default function DatoBot() {
   const [sessionId] = useState(`session-${Date.now()}`);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceLang, setVoiceLang] = useState('fr-FR');
+  const [userLocation, setUserLocation] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -91,7 +92,7 @@ export default function DatoBot() {
 
   async function envoyerFeedback(messageUser, reponseBot, feedback, correction = null) {
     try {
-        await fetch(`${import.meta.env.VITE_API_URL}/feedback`, {
+      await fetch(`${import.meta.env.VITE_API_URL}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -122,19 +123,16 @@ export default function DatoBot() {
       mediaRecorder.onstop = async () => {
         setIsRecording(false);
         stream.getTracks().forEach(t => t.stop());
-
         const blob = new Blob(chunks, { type: mimeType });
         const formData = new FormData();
         const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
         formData.append('audio', blob, `correction.${ext}`);
-
         try {
           const response = await fetch(WOLOF_STT_URL, {
             method: 'POST',
             body: formData
           });
           const data = await response.json();
-
           if (data.success && data.texte) {
             await envoyerFeedback(messageUser, reponseBot, 'mauvais', data.texte);
             alert(`✅ Correction sauvegardée : "${data.texte}"`);
@@ -146,11 +144,31 @@ export default function DatoBot() {
 
       mediaRecorder.start(100);
       setTimeout(() => mediaRecorder.stop(), 5000);
-
     } catch (err) {
       setIsRecording(false);
       console.error('Erreur micro:', err);
     }
+  }
+
+  async function obtenirLocalisation() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject('Géolocalisation non supportée');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setUserLocation(location);
+          resolve(location);
+        },
+        (error) => reject(error),
+        { timeout: 10000 }
+      );
+    });
   }
 
   async function envoyer(texte) {
@@ -158,6 +176,16 @@ export default function DatoBot() {
     if (!msg || loading) return;
     setInput('');
     voiceModeRef.current = false;
+
+    // Obtenir localisation si pas encore fait
+    let location = userLocation;
+    if (!location) {
+      try {
+        location = await obtenirLocalisation();
+      } catch (err) {
+        console.log('Localisation non disponible');
+      }
+    }
 
     const userMsg = {
       role: 'user',
@@ -169,7 +197,7 @@ export default function DatoBot() {
     setLoading(true);
 
     try {
-      const res = await envoyerMessage(msg, sessionId);
+      const res = await envoyerMessage(msg, sessionId, location);
       const { reply, suggestions } = res.data.data;
       const botMsg = {
         role: 'assistant',
@@ -310,15 +338,44 @@ export default function DatoBot() {
       content: voiceLang === 'en-US'
         ? 'Hello! I am DatoBot, your health assistant.\n\nHow can I help you?'
         : voiceLang === 'wo'
-        ? 'Asalaamaalekum ! Maanela DatoBot, sa assistant ci wérguyaram .\n\nNane laay deef guir dimbalila laa  ?'
+        ? 'Asalaamaalekum ! Maa ngi DatoBot, sa assistant ci wérëwér.\n\nLan laa def ngir yéggël ma ?'
         : 'Bonjour ! Je suis DatoBot, votre assistant santé.\n\nComment puis-je vous aider ?',
       suggestions: voiceLang === 'en-US'
         ? ['I want to see a doctor', 'Video consultation', 'Find a pharmacy']
         : voiceLang === 'wo'
-        ? ['Dama bëgg gis doktoor', 'Dama bëgg seet sama yaram sama ker ', 'Farmaasi bi diégué sama ker']
+        ? ['Dama bëgg gis doktoor', 'Dama am metiteu', 'Farmaasi bi']
         : ['Je veux voir un médecin', 'Téléconsultation vidéo', 'Pharmacie près de moi'],
       time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
     }]);
+  }
+
+  // Upload ordonnance
+  const fileInputRef = useRef(null);
+
+  async function uploadOrdonnance(file) {
+    try {
+      const formData = new FormData();
+      formData.append('ordonnance', file);
+      formData.append('session_id', sessionId);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/ordonnances/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMessages(prev => [...prev, {
+          role: 'user',
+          content: `📄 Ordonnance envoyée : ${file.name}`,
+          suggestions: [],
+          time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        }]);
+        await envoyer(`J'ai envoyé mon ordonnance. URL: ${data.url}`);
+      }
+    } catch (err) {
+      console.error('Erreur upload ordonnance:', err);
+    }
   }
 
   return (
@@ -334,6 +391,7 @@ export default function DatoBot() {
             <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
             {voiceLang === 'en-US' ? 'Health assistant · 24/7' : voiceLang === 'wo' ? 'Assistant wérëwér · 24/7 🇸🇳' : 'Assistant santé · 24h/24'}
             {isRecording && <span style={{ background: '#DC2626', color: '#fff', fontSize: '0.55rem', padding: '1px 5px', borderRadius: '6px', marginLeft: '3px' }}>🎙️</span>}
+            {userLocation && <span style={{ fontSize: '0.55rem', color: '#22C55E', marginLeft: '3px' }}>📍</span>}
           </div>
         </div>
 
@@ -489,6 +547,20 @@ export default function DatoBot() {
             }
             style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '0.875rem', color: 'var(--ink)', outline: 'none', fontFamily: 'var(--sans)', minWidth: 0 }}
           />
+
+          {/* Bouton upload ordonnance */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf"
+            style={{ display: 'none' }}
+            onChange={e => e.target.files[0] && uploadOrdonnance(e.target.files[0])}
+          />
+          <button onClick={() => fileInputRef.current?.click()}
+            style={{ width: '34px', height: '34px', borderRadius: '9px', border: 'none', background: 'var(--green-light)', color: 'var(--green)', fontSize: '0.9rem', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            📄
+          </button>
+
           <button onClick={toggleVoice}
             style={{ width: '34px', height: '34px', borderRadius: '9px', border: 'none', background: isRecording ? '#DC2626' : voiceLang === 'wo' ? '#006B3F' : 'var(--green-light)', color: isRecording ? '#fff' : voiceLang === 'wo' ? '#fff' : 'var(--green)', fontSize: '0.9rem', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
             {isRecording ? '⏹️' : voiceLang === 'wo' ? '🇸🇳' : '🎙️'}
